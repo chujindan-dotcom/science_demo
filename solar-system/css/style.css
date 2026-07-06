@@ -107,6 +107,74 @@ html, body {
   border-color: rgba(255, 200, 130, 0.5);
 }
 
+/* ---------- 深空 / 星宿标签 ---------- */
+
+.sky-label {
+  font-size: 12px;
+  pointer-events: auto;
+  user-select: none;
+  white-space: nowrap;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 1px 2px #000;
+}
+
+.sky-label.mansion {
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+
+.sky-label.mansion:hover { filter: brightness(1.4); }
+
+.sky-label.xiang {
+  font-size: 12px;
+  opacity: 0.7;
+  letter-spacing: 3px;
+  writing-mode: vertical-rl;
+}
+
+.sky-label.nebula,
+.sky-label.band {
+  font-size: 12px;
+  color: #ffb0c8;
+  cursor: pointer;
+  border: 1px dashed rgba(255, 150, 190, 0.4);
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(20, 6, 16, 0.4);
+}
+
+.sky-label.band { color: #cfd8ff; border-color: rgba(160, 180, 255, 0.4); background: rgba(8, 12, 30, 0.4); }
+.sky-label.nebula:hover, .sky-label.band:hover { filter: brightness(1.3); }
+
+.sky-label.sun-here {
+  font-size: 13px;
+  color: #ffe6b0;
+  cursor: pointer;
+  border: 1px solid rgba(255, 210, 130, 0.6);
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(30, 20, 6, 0.55);
+  font-weight: 600;
+}
+
+.sky-label.galactic-center {
+  font-size: 12px;
+  color: #ffcf9a;
+  text-shadow: 0 0 8px rgba(255, 180, 90, 0.9);
+}
+
+.body-btn.galaxy-btn {
+  border-color: rgba(160, 150, 255, 0.45);
+  color: #c8c0ff;
+}
+
+.body-btn.galaxy-btn.active {
+  background: rgba(120, 100, 220, 0.6);
+  border-color: rgba(180, 160, 255, 0.8);
+  color: #fff;
+}
+
 /* ---------- 底部控制栏 ---------- */
 
 .control-bar {

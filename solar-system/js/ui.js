@@ -4,13 +4,16 @@ import { BODIES, PLANET_ORDER } from './data.js';
 const SELECTABLE = ['sun', ...PLANET_ORDER.slice(0, 3), 'moon', ...PLANET_ORDER.slice(3)];
 
 export function buildUI(callbacks) {
-  const { onSpeedChange, onTogglePause, onToggleOrbits, onToggleLabels, onSelectBody, onResetView } = callbacks;
+  const {
+    onSpeedChange, onTogglePause, onToggleOrbits, onToggleLabels,
+    onSelectBody, onResetView, onToggleDeepSky, onEnterGalaxy,
+  } = callbacks;
 
   /* 顶部标题 */
   const header = el('div', 'header');
   header.innerHTML = `
     <h1>宇宙天体 3D 演示</h1>
-    <p>拖拽旋转视角 · 滚轮 / 双指缩放 · 点击天体查看科普信息</p>
+    <p>拖拽旋转视角 · 滚轮 / 双指缩放 · 点击天体 / 星宿查看科普信息</p>
   `;
   document.body.appendChild(header);
 
@@ -29,10 +32,22 @@ export function buildUI(callbacks) {
     btn.addEventListener('click', () => onSelectBody(key));
     bodyRow.appendChild(btn);
   }
+  const galaxyBtn = el('button', 'body-btn galaxy-btn');
+  galaxyBtn.textContent = '银河系';
+  galaxyBtn.title = '拉远到银盘外俯瞰整个银河系';
+  galaxyBtn.addEventListener('click', () => {
+    const on = !galaxyBtn.classList.contains('active');
+    // 先触发模式切换(其内部会清空天体高亮),再设置本按钮高亮,避免被清掉
+    onEnterGalaxy(on);
+    galaxyBtn.classList.toggle('active', on);
+  });
+  bodyRow.appendChild(galaxyBtn);
+
   const overviewBtn = el('button', 'body-btn overview');
   overviewBtn.textContent = '全景';
-  overviewBtn.addEventListener('click', onResetView);
+  overviewBtn.addEventListener('click', () => { galaxyBtn.classList.remove('active'); onResetView(); });
   bodyRow.appendChild(overviewBtn);
+
   bar.appendChild(bodyRow);
 
   const ctrlRow = el('div', 'ctrl-row');
@@ -67,8 +82,10 @@ export function buildUI(callbacks) {
 
   const orbitToggle = makeToggle('轨道', true, onToggleOrbits);
   const labelToggle = makeToggle('标签', true, onToggleLabels);
+  const skyToggle = makeToggle('星宿', true, onToggleDeepSky);
   ctrlRow.appendChild(orbitToggle);
   ctrlRow.appendChild(labelToggle);
+  ctrlRow.appendChild(skyToggle);
 
   bar.appendChild(ctrlRow);
   document.body.appendChild(bar);
@@ -88,6 +105,19 @@ export function buildUI(callbacks) {
     });
   }
 
+  // 渲染任意信息对象:{ name, en, type, rows:[[k,v]], facts:[], note }
+  function showInfoData(obj) {
+    if (!obj) return;
+    panel.querySelector('.info-content').innerHTML = `
+      <h2>${obj.name}${obj.en ? ` <span class="en">${obj.en}</span>` : ''}</h2>
+      <table>${obj.rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>
+      <h3>你知道吗?</h3>
+      <ul>${obj.facts.map((f) => `<li>${f}</li>`).join('')}</ul>
+      <p class="scale-note">${obj.note || '* 演示中天体大小与轨道距离经过压缩,并非真实比例。'}</p>
+    `;
+    panel.classList.add('open');
+  }
+
   function showInfo(key) {
     const d = BODIES[key];
     if (!d) return;
@@ -98,15 +128,7 @@ export function buildUI(callbacks) {
       ['自转周期', formatDays(Math.abs(d.rotationDays)) + (d.rotationDays < 0 ? '(逆行)' : '')],
       d.tiltDeg !== undefined ? ['自转轴倾角', `${d.tiltDeg}°`] : null,
     ].filter(Boolean);
-
-    panel.querySelector('.info-content').innerHTML = `
-      <h2>${d.name} <span class="en">${d.en}</span></h2>
-      <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>
-      <h3>你知道吗?</h3>
-      <ul>${d.facts.map((f) => `<li>${f}</li>`).join('')}</ul>
-      <p class="scale-note">* 演示中天体大小与轨道距离经过压缩,并非真实比例。</p>
-    `;
-    panel.classList.add('open');
+    showInfoData({ name: d.name, en: d.en, rows, facts: d.facts });
     setActiveButton(key);
   }
 
@@ -116,8 +138,10 @@ export function buildUI(callbacks) {
     clock.textContent = `模拟时间:${years} 年 ${days} 天`;
   }
 
+  function closePanel() { panel.classList.remove('open'); }
+
   applySpeed();
-  return { showInfo, updateClock, setActiveButton };
+  return { showInfo, showInfoData, updateClock, setActiveButton, closePanel };
 }
 
 function formatDays(days) {
