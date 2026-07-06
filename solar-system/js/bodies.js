@@ -69,7 +69,7 @@ const SUN_SHADER = {
       float limb = dot(vNormal, vec3(0.0, 0.0, 1.0));
       col *= 0.72 + 0.28 * smoothstep(0.0, 0.7, limb);
 
-      gl_FragColor = vec4(col * 1.6, 1.0); // >1 亮度触发泛光
+      gl_FragColor = vec4(col * 1.12, 1.0); // 略高于 1 触发适度泛光,但保留表面米粒细节
     }
   `,
 };
@@ -93,10 +93,10 @@ export function createSun() {
     depthWrite: false,
     transparent: true,
   }));
-  corona.scale.setScalar(data.displayRadius * 7);
+  corona.scale.setScalar(data.displayRadius * 4.2);
   group.add(corona);
 
-  const light = new THREE.PointLight(0xfff2dd, 2.6, 0, 0);
+  const light = new THREE.PointLight(0xfff2dd, 2.1, 0, 0);
   group.add(light);
 
   return { group, mesh, mat, data };

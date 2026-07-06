@@ -33,7 +33,7 @@ document.getElementById('app').appendChild(labelRenderer.domElement);
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.9, 0.7, 0.82);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.6, 0.9);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
