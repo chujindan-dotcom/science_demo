@@ -17,14 +17,25 @@
 
 ## 本地运行
 
+推荐用附带脚本启动,它会**绑定所有网卡(`0.0.0.0`)**并打印局域网访问地址,方便手机/平板真机测试:
+
 ```bash
-# 任选一种静态服务器,在仓库根目录执行:
-python3 -m http.server 8000
-# 或
-npx serve
+./serve.sh          # 默认端口 8123,绑定 0.0.0.0
+./serve.sh 8080     # 指定端口
 ```
 
-然后浏览器打开 http://localhost:8000 即可。需要联网加载 Three.js CDN(unpkg)。
+或手动启动(同样绑定所有 IP):
+
+```bash
+python3 -m http.server 8123 --bind 0.0.0.0
+# 或
+npx serve -l tcp://0.0.0.0:8123
+```
+
+- 本机打开:http://localhost:8123/
+- 局域网真机打开:http://<本机局域网IP>:8123/(手机需连同一 WiFi;若打不开,检查防火墙是否放行该端口)
+
+页面需联网加载 Three.js CDN(unpkg)。也可直接访问已部署的在线版:<https://chujindan-dotcom.github.io/science_demo/>
 
 ## 技术栈
 
