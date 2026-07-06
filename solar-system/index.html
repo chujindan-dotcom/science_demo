@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>宇宙天体 3D 演示 · 太阳系</title>
+  <meta name="description" content="太阳系 3D 科普演示:行星公转自转、程序化材质、可交互视角与时间流速">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>正在生成宇宙……</p>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

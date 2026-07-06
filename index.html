@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Science Demo · 科普演示合集</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 30% 20%, #101a33 0%, #05070f 70%);
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+      color: #dde6f2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 20px;
+    }
+    h1 {
+      font-size: 32px;
+      letter-spacing: 4px;
+      background: linear-gradient(90deg, #cfe3ff, #ffd9a0);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 10px;
+    }
+    .subtitle { color: #7d8ba3; font-size: 14px; margin-bottom: 48px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 340px));
+      gap: 24px;
+      justify-content: center;
+      width: 100%;
+      max-width: 1100px;
+    }
+    .card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid rgba(120, 150, 200, 0.25);
+      border-radius: 16px;
+      padding: 26px 24px;
+      background: rgba(16, 24, 44, 0.6);
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(150, 190, 255, 0.6);
+      box-shadow: 0 12px 40px rgba(40, 80, 180, 0.25);
+    }
+    .card .icon { font-size: 40px; margin-bottom: 14px; }
+    .card h2 { font-size: 18px; color: #f0f5ff; margin-bottom: 8px; }
+    .card p { font-size: 13px; line-height: 1.7; color: #93a7c4; }
+    .footer { margin-top: 60px; font-size: 12px; color: #4d5a72; }
+    .footer a { color: #7fa8e0; }
+  </style>
+</head>
+<body>
+  <h1>科普演示合集</h1>
+  <p class="subtitle">Interactive Science Demos · 用交互动画理解科学</p>
+  <div class="grid">
+    <a class="card" href="solar-system/">
+      <div class="icon">🪐</div>
+      <h2>宇宙天体 3D 演示</h2>
+      <p>太阳系八大行星与月球的公转自转、程序化材质(火焰 / 气体 / 冰 / 岩石)、小行星带与远方旋涡星系。视角、缩放、时间流速均可交互调节。</p>
+    </a>
+  </div>
+  <p class="footer">开源于 <a href="https://github.com/chujindan/science_demo">github.com/chujindan/science_demo</a> · 持续添加更多演示</p>
+</body>
+</html>
