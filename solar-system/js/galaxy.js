@@ -167,6 +167,13 @@ export function buildDeepSpace(scene) {
   scene.add(distant);
   galaxies.push({ points: distant, speed: 0.008 });
 
+  // 压暗为远方暗弱的星系:真实夜空里它们只是朦胧小斑,不该抢戏
+  for (const g of galaxies) {
+    g.points.material.opacity = 0.5;
+    g.points.material.size *= 0.7;
+    g.points.children.forEach((c) => { if (c.material) c.material.opacity *= 0.5; });
+  }
+
   function update(dt) {
     for (const g of galaxies) g.points.rotation.y += g.speed * dt;
   }

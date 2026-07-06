@@ -5,6 +5,9 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 import { buildSolarSystem } from './bodies.js';
@@ -35,6 +38,14 @@ const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.6, 0.9);
 composer.addPass(bloom);
+// 克制的暗角,把视线引向画面中心
+const vignette = new ShaderPass(VignetteShader);
+vignette.uniforms.offset.value = 1.05;
+vignette.uniforms.darkness.value = 1.15;
+composer.addPass(vignette);
+// SMAA 抗锯齿:EffectComposer 默认渲染目标无 MSAA,补一道让边缘干净
+const smaa = new SMAAPass(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
+composer.addPass(smaa);
 composer.addPass(new OutputPass());
 
 const controls = new OrbitControls(camera, labelRenderer.domElement);

@@ -96,7 +96,7 @@ export function createSun() {
   corona.scale.setScalar(data.displayRadius * 4.2);
   group.add(corona);
 
-  const light = new THREE.PointLight(0xfff2dd, 2.1, 0, 0);
+  const light = new THREE.PointLight(0xfff4e2, 2.7, 0, 0);
   group.add(light);
 
   return { group, mesh, mat, data };
@@ -165,11 +165,11 @@ const ATMOSPHERES = {
 };
 
 const MATERIAL_TWEAKS = {
-  mercury: { roughness: 0.95 },
+  mercury: { roughness: 0.95, bump: 0.10 },
   venus: { roughness: 0.7 },
-  earth: { roughness: 0.55 },
-  moon: { roughness: 0.98 },
-  mars: { roughness: 0.9 },
+  earth: { roughness: 0.7, bump: 0.045 }, // roughness 由贴图控制,这里作基准
+  moon: { roughness: 0.98, bump: 0.09 },
+  mars: { roughness: 0.9, bump: 0.07 },
   jupiter: { roughness: 0.65 },
   saturn: { roughness: 0.65 },
   uranus: { roughness: 0.5 },
@@ -192,12 +192,18 @@ function createPlanet(key) {
   anchor.add(bodyGroup);
 
   const tex = TEXTURE_MAKERS[key]();
+  const tw = MATERIAL_TWEAKS[key];
   const mat = new THREE.MeshStandardMaterial({
-    map: tex,
-    roughness: MATERIAL_TWEAKS[key].roughness,
+    map: tex.map,
+    bumpMap: tex.bump || null,
+    bumpScale: tw.bump || 0,
+    roughnessMap: tex.rough || null,
+    roughness: tw.roughness,
     metalness: 0.0,
   });
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 32), mat);
+  // 大行星用更高细分,近距离不露多边形棱角
+  const seg = r >= 6 ? 96 : 64;
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, seg, seg / 2), mat);
   mesh.name = key;
   bodyGroup.add(mesh);
 
@@ -322,7 +328,8 @@ export function buildSolarSystem(scene) {
   const belt = createAsteroidBelt();
   scene.add(belt);
 
-  scene.add(new THREE.AmbientLight(0x223344, 0.5));
+  // 极低环境光:夜半球接近漆黑,晨昏线更有戏剧性(纪录片式明暗)
+  scene.add(new THREE.AmbientLight(0x141c2e, 0.22));
 
   // elapsedDays: 模拟经过的天数
   function update(elapsedDays, dtSeconds) {

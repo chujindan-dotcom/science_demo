@@ -89,6 +89,29 @@ function paintSphereTexture(w, h, pixelFn) {
   ctx.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8; // 各向异性过滤,掠射角更锐利(硬件不支持会自动截断)
+  return { tex, canvas, ctx };
+}
+
+// 灰度贴图(凹凸 / 粗糙度等线性数据):fn(theta,lat) -> 0..1
+function paintGrayTexture(w, h, fn) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  for (let y = 0; y < h; y++) {
+    const lat = y / (h - 1);
+    for (let x = 0; x < w; x++) {
+      const theta = (x / w) * Math.PI * 2;
+      const v = Math.max(0, Math.min(1, fn(theta, lat))) * 255;
+      const i = (y * w + x) * 4;
+      d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 8;
   return { tex, canvas, ctx };
 }
 
@@ -120,22 +143,30 @@ function addCraters(ctx, w, h, count, seed, minR, maxR) {
 
 /* ---------- 各天体纹理 ---------- */
 
+// 返回 { map, bump }:颜色纹理 + 同源凹凸纹理(陨石坑成凹陷+隆起环)
 function rockyTexture({ seed, palette, freq = 3, octaves = 5, craters = 0, craterSeed = 1, size = 1024 }) {
-  const { tex, canvas, ctx } = paintSphereTexture(size, size / 2, (theta, lat) => {
+  const color = paintSphereTexture(size, size / 2, (theta, lat) => {
     const cx = Math.cos(theta) * freq, cz = Math.sin(theta) * freq;
     const n = fbm3(cx, lat * freq * 2, cz, seed, octaves);
     return samplePalette(palette, n);
   });
+  const bump = paintGrayTexture(size, size / 2, (theta, lat) => {
+    const cx = Math.cos(theta) * freq, cz = Math.sin(theta) * freq;
+    return 0.35 + fbm3(cx, lat * freq * 2, cz, seed, octaves) * 0.5;
+  });
   if (craters > 0) {
-    addCraters(ctx, canvas.width, canvas.height, craters, craterSeed, 4, 26);
-    tex.needsUpdate = true;
+    addCraters(color.ctx, size, size / 2, craters, craterSeed, 4, 26);
+    color.tex.needsUpdate = true;
+    // 相同 craterSeed → 同样的坑位置,凹凸与颜色对齐
+    addCraters(bump.ctx, size, size / 2, craters, craterSeed, 4, 26);
+    bump.tex.needsUpdate = true;
   }
-  return tex;
+  return { map: color.tex, bump: bump.tex };
 }
 
 export function mercuryTexture() {
   return rockyTexture({
-    seed: 11, freq: 4, craters: 220, craterSeed: 7,
+    seed: 11, freq: 4, craters: 260, craterSeed: 7, size: 1536,
     palette: [
       [0.30, [82, 78, 74]], [0.45, [122, 117, 110]],
       [0.60, [150, 144, 136]], [0.75, [176, 170, 160]], [1.0, [200, 195, 186]],
@@ -145,7 +176,7 @@ export function mercuryTexture() {
 
 export function moonTexture() {
   return rockyTexture({
-    seed: 23, freq: 3.5, craters: 160, craterSeed: 13,
+    seed: 23, freq: 3.5, craters: 200, craterSeed: 13, size: 1536,
     palette: [
       [0.30, [92, 92, 96]], [0.48, [128, 128, 132]],
       [0.62, [158, 158, 160]], [1.0, [196, 196, 198]],
@@ -155,45 +186,60 @@ export function moonTexture() {
 
 export function venusTexture() {
   // 浓密硫酸云:柔和的斜向条纹 + 涡旋
-  return paintSphereTexture(1024, 512, (theta, lat) => {
-    const cx = Math.cos(theta), cz = Math.sin(theta);
-    const swirl = fbm3(cx * 2.2, lat * 5 - theta * 0.35, cz * 2.2, 31, 5);
-    const band = Math.sin(lat * Math.PI * 5 + swirl * 6) * 0.5 + 0.5;
-    const n = band * 0.55 + swirl * 0.45;
-    return samplePalette([
-      [0.20, [166, 124, 66]], [0.45, [205, 165, 100]],
-      [0.68, [232, 200, 138]], [1.0, [248, 230, 180]],
-    ], n);
-  }).tex;
+  return {
+    map: paintSphereTexture(1024, 512, (theta, lat) => {
+      const cx = Math.cos(theta), cz = Math.sin(theta);
+      const swirl = fbm3(cx * 2.2, lat * 5 - theta * 0.35, cz * 2.2, 31, 5);
+      const band = Math.sin(lat * Math.PI * 5 + swirl * 6) * 0.5 + 0.5;
+      const n = band * 0.55 + swirl * 0.45;
+      return samplePalette([
+        [0.20, [166, 124, 66]], [0.45, [205, 165, 100]],
+        [0.68, [232, 200, 138]], [1.0, [248, 230, 180]],
+      ], n);
+    }).tex,
+  };
 }
 
+// 地球:颜色 + 凹凸(陆地起伏) + 粗糙度(海洋反光、陆地哑光)
 export function earthTexture() {
-  return paintSphereTexture(1400, 700, (theta, lat) => {
-    const f = 2.3;
+  const size = 1600, half = 800;
+  const f = 2.3;
+  // 复用同一 fbm 计算,分别产出三张贴图
+  const sample = (theta, lat) => {
     const cx = Math.cos(theta) * f, cz = Math.sin(theta) * f;
     const n = fbm3(cx, lat * f * 2, cz, 47, 6);
     const detail = fbm3(cx * 4, lat * f * 8, cz * 4, 91, 4);
-    const polar = Math.abs(lat - 0.5) * 2; // 0 赤道 -> 1 极点
-    // 极地冰盖
+    const polar = Math.abs(lat - 0.5) * 2;
+    return { n, detail, polar, cx, cz };
+  };
+  const color = paintSphereTexture(size, half, (theta, lat) => {
+    const { n, detail, polar, cx, cz } = sample(theta, lat);
     if (polar > 0.86 + detail * 0.08) return [235, 240, 245];
     if (n > 0.545) {
-      // 陆地:海拔越高越偏灰白,低处绿色,干旱区棕黄
       const height = (n - 0.545) / 0.2;
       const dry = fbm3(cx * 2 + 9, lat * 6, cz * 2, 133, 4);
       let c = dry > 0.55
         ? samplePalette([[0, [120, 108, 62]], [0.6, [168, 146, 88]], [1, [196, 178, 120]]], height + detail * 0.3)
         : samplePalette([[0, [44, 92, 42]], [0.5, [76, 118, 56]], [1, [130, 140, 90]]], height + detail * 0.3);
-      // 高纬度陆地渐雪
       if (polar > 0.72) c = mixColor(c, [230, 235, 240], (polar - 0.72) / 0.14);
       return c;
     }
-    // 海洋:接近海岸线的浅海更亮
     const depth = (0.545 - n) / 0.545;
     return samplePalette([
       [0.0, [64, 138, 180]], [0.08, [30, 92, 152]],
       [0.35, [16, 60, 118]], [1.0, [8, 32, 82]],
     ], depth);
-  }).tex;
+  });
+  const bump = paintGrayTexture(size, half, (theta, lat) => {
+    const { n } = sample(theta, lat);
+    return n > 0.545 ? 0.5 + (n - 0.545) * 2.2 : 0.42; // 海平面平坦,陆地随海拔隆起
+  });
+  const rough = paintGrayTexture(size, half, (theta, lat) => {
+    const { n, polar, detail } = sample(theta, lat);
+    if (polar > 0.86 + detail * 0.08) return 0.85; // 冰盖
+    return n > 0.545 ? 0.92 : 0.28;               // 陆地哑光 / 海洋反光
+  });
+  return { map: color.tex, bump: bump.tex, rough: rough.tex };
 }
 
 export function earthCloudTexture() {
@@ -220,8 +266,8 @@ export function earthCloudTexture() {
 }
 
 export function marsTexture() {
-  const { tex, canvas, ctx } = paintSphereTexture(1024, 512, (theta, lat) => {
-    const f = 3;
+  const size = 1536, half = 768, f = 3;
+  const color = paintSphereTexture(size, half, (theta, lat) => {
     const cx = Math.cos(theta) * f, cz = Math.sin(theta) * f;
     const n = fbm3(cx, lat * f * 2, cz, 57, 6);
     const polar = Math.abs(lat - 0.5) * 2;
@@ -232,34 +278,42 @@ export function marsTexture() {
       [0.62, [188, 100, 52]], [0.80, [214, 130, 74]], [1.0, [232, 164, 104]],
     ], n);
   });
-  addCraters(ctx, canvas.width, canvas.height, 60, 21, 3, 14);
-  tex.needsUpdate = true;
-  return tex;
+  addCraters(color.ctx, size, half, 90, 21, 3, 16);
+  color.tex.needsUpdate = true;
+  const bump = paintGrayTexture(size, half, (theta, lat) => {
+    const cx = Math.cos(theta) * f, cz = Math.sin(theta) * f;
+    return 0.35 + fbm3(cx, lat * f * 2, cz, 57, 6) * 0.5;
+  });
+  addCraters(bump.ctx, size, half, 90, 21, 3, 16);
+  bump.tex.needsUpdate = true;
+  return { map: color.tex, bump: bump.tex };
 }
 
 // 气态行星:纬向条纹 + 湍流扰动
 function gasTexture({ seed, palette, bands, turbulence, spot }) {
-  return paintSphereTexture(1024, 512, (theta, lat) => {
-    const cx = Math.cos(theta), cz = Math.sin(theta);
-    const turb = fbm3(cx * 3, lat * 10, cz * 3, seed, 5);
-    const flow = fbm3(cx * 1.5 + 40, lat * 4, cz * 1.5, seed + 7, 4);
-    let t = Math.sin(lat * Math.PI * bands + (turb - 0.5) * turbulence + (flow - 0.5) * 2) * 0.5 + 0.5;
-    t = t * 0.8 + turb * 0.2;
-    let c = samplePalette(palette, t);
-    if (spot) {
-      // 大红斑之类的椭圆风暴
-      const dTheta = Math.atan2(Math.sin(theta - spot.theta), Math.cos(theta - spot.theta));
-      const dx = dTheta / spot.w, dy = (lat - spot.lat) / spot.h;
-      const dist = dx * dx + dy * dy;
-      if (dist < 1) {
-        const s = 1 - dist;
-        const ring = Math.sin(Math.min(1, dist) * Math.PI);
-        c = mixColor(c, spot.color, Math.min(1, s * 1.6));
-        c = mixColor(c, [255, 240, 220], ring * 0.18);
+  return {
+    map: paintSphereTexture(1280, 640, (theta, lat) => {
+      const cx = Math.cos(theta), cz = Math.sin(theta);
+      const turb = fbm3(cx * 3, lat * 10, cz * 3, seed, 5);
+      const flow = fbm3(cx * 1.5 + 40, lat * 4, cz * 1.5, seed + 7, 4);
+      let t = Math.sin(lat * Math.PI * bands + (turb - 0.5) * turbulence + (flow - 0.5) * 2) * 0.5 + 0.5;
+      t = t * 0.8 + turb * 0.2;
+      let c = samplePalette(palette, t);
+      if (spot) {
+        // 大红斑之类的椭圆风暴
+        const dTheta = Math.atan2(Math.sin(theta - spot.theta), Math.cos(theta - spot.theta));
+        const dx = dTheta / spot.w, dy = (lat - spot.lat) / spot.h;
+        const dist = dx * dx + dy * dy;
+        if (dist < 1) {
+          const s = 1 - dist;
+          const ring = Math.sin(Math.min(1, dist) * Math.PI);
+          c = mixColor(c, spot.color, Math.min(1, s * 1.6));
+          c = mixColor(c, [255, 240, 220], ring * 0.18);
+        }
       }
-    }
-    return c;
-  }).tex;
+      return c;
+    }).tex,
+  };
 }
 
 export function jupiterTexture() {

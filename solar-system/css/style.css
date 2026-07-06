@@ -8,6 +8,8 @@ html, body {
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
   color: #dde6f2;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app { position: fixed; inset: 0; }
@@ -180,19 +182,21 @@ html, body {
 .control-bar {
   position: fixed;
   left: 50%;
-  bottom: 14px;
+  bottom: 16px;
   transform: translateX(-50%);
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   align-items: center;
-  padding: 10px 16px;
-  border-radius: 16px;
-  background: rgba(12, 18, 34, 0.66);
-  border: 1px solid rgba(120, 150, 200, 0.22);
-  backdrop-filter: blur(10px);
-  max-width: min(96vw, 720px);
+  padding: 12px 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(20, 28, 48, 0.62), rgba(8, 12, 24, 0.72));
+  border: 1px solid rgba(140, 170, 220, 0.18);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  max-width: min(96vw, 740px);
 }
 
 .body-row {
@@ -204,21 +208,26 @@ html, body {
 
 .body-btn {
   font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(130, 160, 210, 0.3);
-  background: rgba(30, 42, 70, 0.5);
+  padding: 5px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(140, 168, 214, 0.26);
+  background: rgba(38, 50, 80, 0.42);
   color: #b8c8e0;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
 }
 
-.body-btn:hover { background: rgba(60, 82, 130, 0.6); color: #fff; }
+.body-btn:hover {
+  background: rgba(66, 90, 140, 0.6);
+  color: #fff;
+  transform: translateY(-1px);
+}
 
 .body-btn.active {
-  background: rgba(90, 130, 220, 0.55);
-  border-color: rgba(150, 190, 255, 0.7);
+  background: rgba(96, 138, 228, 0.6);
+  border-color: rgba(160, 198, 255, 0.75);
   color: #fff;
+  box-shadow: 0 0 14px rgba(110, 150, 240, 0.45);
 }
 
 .body-btn.overview {
