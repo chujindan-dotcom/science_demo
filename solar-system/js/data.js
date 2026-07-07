@@ -124,4 +124,18 @@ export const PLANET_ORDER = [
   'mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune',
 ];
 
+// 轨道真实参数:incl=轨道倾角(相对黄道,°),node=升交点黄经(°)
+// 地球轨道即黄道面,倾角为 0
+export const ORBIT = {
+  mercury: { incl: 7.00, node: 48.3 },
+  venus: { incl: 3.39, node: 76.7 },
+  earth: { incl: 0.0, node: 0 },
+  mars: { incl: 1.85, node: 49.6 },
+  jupiter: { incl: 1.30, node: 100.5 },
+  saturn: { incl: 2.49, node: 113.7 },
+  uranus: { incl: 0.77, node: 74.0 },
+  neptune: { incl: 1.77, node: 131.8 },
+  moon: { incl: 5.14, node: 125.0 },
+};
+
 export const BELT = { inner: 118, outer: 145, count: 900 };

@@ -1,6 +1,6 @@
 // 天体构建:太阳(着色器动画)、行星、月球、土星环、大气辉光、轨道线、小行星带
 import * as THREE from 'three';
-import { BODIES, INITIAL_PHASE, PLANET_ORDER, BELT } from './data.js';
+import { BODIES, INITIAL_PHASE, PLANET_ORDER, BELT, ORBIT } from './data.js';
 import * as TEX from './textures.js';
 
 const DEG = Math.PI / 180;
@@ -96,10 +96,81 @@ export function createSun() {
   corona.scale.setScalar(data.displayRadius * 4.2);
   group.add(corona);
 
+  // 色球层:贴着表面的一层偏红辉光,给太阳一圈"活"的边缘
+  const chromosphere = new THREE.Mesh(
+    new THREE.SphereGeometry(data.displayRadius * 1.015, 64, 32),
+    new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(0xff5522) } },
+      vertexShader: /* glsl */ `
+        varying vec3 vNormal; varying vec3 vView;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vView = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor; varying vec3 vNormal; varying vec3 vView;
+        void main() {
+          float rim = pow(1.0 - abs(dot(vNormal, vView)), 3.0);
+          gl_FragColor = vec4(uColor, rim * 0.9);
+        }
+      `,
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    }),
+  );
+  group.add(chromosphere);
+
+  // 日珥:表面若干处向外喷发的等离子弧,缓慢脉动
+  const proms = createSunProminences(data.displayRadius);
+  group.add(proms.group);
+
   const light = new THREE.PointLight(0xfff4e2, 2.7, 0, 0);
   group.add(light);
 
-  return { group, mesh, mat, data };
+  let promTime = 0;
+  function updateProminences(dt) {
+    promTime += dt;
+    proms.update(promTime);
+  }
+
+  return { group, mesh, mat, data, updateProminences };
+}
+
+// 日珥:在太阳表面随机点上放置向外的加色"火舌"精灵,各自相位脉动
+function createSunProminences(radius, count = 14) {
+  const group = new THREE.Group();
+  const tex = TEX.glowSpriteTexture('rgba(255,150,60,1)', 'rgba(255,90,20,0)');
+  let s = 20260706;
+  const rand = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const items = [];
+  for (let i = 0; i < count; i++) {
+    const u = rand() * 2 - 1;
+    const phi = rand() * Math.PI * 2;
+    const sinT = Math.sqrt(1 - u * u);
+    const dir = new THREE.Vector3(sinT * Math.cos(phi), u, sinT * Math.sin(phi));
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
+      color: new THREE.Color().setHSL(0.03 + rand() * 0.05, 1, 0.6),
+    }));
+    const base = radius * (0.18 + rand() * 0.22);
+    sprite.position.copy(dir).multiplyScalar(radius * 1.02);
+    sprite.scale.setScalar(base);
+    group.add(sprite);
+    items.push({ sprite, dir, base, speed: 0.4 + rand() * 0.9, phase: rand() * Math.PI * 2, reach: radius * (0.06 + rand() * 0.12) });
+  }
+  function update(t) {
+    for (const it of items) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * it.speed + it.phase);
+      const sc = it.base * (0.7 + pulse * 0.6);
+      it.sprite.scale.setScalar(sc);
+      it.sprite.material.opacity = 0.35 + pulse * 0.5;
+      // 随脉动略微向外抬升,像喷发
+      it.sprite.position.copy(it.dir).multiplyScalar(radius * 1.02 + it.reach * pulse);
+    }
+  }
+  return { group, update };
 }
 
 /* ---------- 大气辉光(菲涅尔边缘光) ---------- */
@@ -181,11 +252,22 @@ function createPlanet(key) {
   const data = BODIES[key];
   const r = data.displayRadius;
 
-  // orbitGroup 绕太阳,anchor 定位在轨道半径处,bodyGroup 承载倾角与自转
+  // inclGroup 承载轨道倾角(相对黄道),orbitGroup 在其内绕太阳公转
+  const orbit = ORBIT[key] || { incl: 0, node: 0 };
+  const inclGroup = new THREE.Group();
+  inclGroup.rotation.order = 'YXZ';
+  inclGroup.rotation.y = orbit.node * DEG;  // 升交点黄经
+  inclGroup.rotation.x = orbit.incl * DEG;  // 轨道倾角
+
   const orbitGroup = new THREE.Group();
+  inclGroup.add(orbitGroup);
   const anchor = new THREE.Group();
   anchor.position.x = data.displayDist;
   orbitGroup.add(anchor);
+
+  // 轨道线放在倾斜平面内,与实际轨道一致
+  const orbitLine = createOrbitLine(data.displayDist);
+  inclGroup.add(orbitLine);
 
   const bodyGroup = new THREE.Group();
   bodyGroup.rotation.z = -data.tiltDeg * DEG;
@@ -226,8 +308,9 @@ function createPlanet(key) {
     bodyGroup.add(clouds);
   }
 
+  let ringMesh = null, ringMat = null;
   if (key === 'saturn') {
-    const ringGeo = new THREE.RingGeometry(r * 1.35, r * 2.4, 128, 1);
+    const ringGeo = new THREE.RingGeometry(r * 1.35, r * 2.4, 192, 1);
     // 重映射 UV:u = 半径比例,使一维环带纹理沿半径展开
     const pos = ringGeo.attributes.position;
     const uv = ringGeo.attributes.uv;
@@ -236,18 +319,54 @@ function createPlanet(key) {
       const len = Math.hypot(pos.getX(i), pos.getY(i));
       uv.setXY(i, (len - inner) / (outer - inner), 0.5);
     }
-    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
-      map: TEX.saturnRingTexture(),
+    // 自定义着色器:行星本影投在环上(对每个环上点做球体遮挡测试)
+    ringMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uMap: { value: TEX.saturnRingTexture() },
+        uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+        uPlanetR: { value: r },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        varying vec3 vLocal;
+        void main() {
+          vUv = uv;
+          vLocal = position.xyz; // 环几何局部坐标(planet 在原点)
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uMap;
+        uniform vec3 uSunDir;
+        uniform float uPlanetR;
+        varying vec2 vUv;
+        varying vec3 vLocal;
+        void main() {
+          vec4 tex = texture2D(uMap, vec2(vUv.x, 0.5));
+          if (tex.a < 0.01) discard;
+          // 从环上点朝太阳方向,若被行星球体遮挡则处于本影中
+          float t0 = dot(-vLocal, uSunDir);
+          float shade = 1.0;
+          if (t0 > 0.0) {
+            vec3 closest = vLocal + uSunDir * t0;
+            float d = length(closest);
+            shade = mix(0.22, 1.0, smoothstep(uPlanetR * 0.98, uPlanetR * 1.12, d));
+          }
+          gl_FragColor = vec4(tex.rgb * shade, tex.a);
+        }
+      `,
       side: THREE.DoubleSide,
       transparent: true,
       depthWrite: false,
-    }));
-    ring.rotation.x = -Math.PI / 2;
-    bodyGroup.add(ring);
+    });
+    ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.rotation.x = -Math.PI / 2;
+    bodyGroup.add(ringMesh);
   }
 
   return {
-    key, data, orbitGroup, anchor, bodyGroup, mesh, clouds,
+    key, data, inclGroup, orbitGroup, anchor, bodyGroup, mesh, clouds, orbitLine,
+    ringMesh, ringMat,
     phase: INITIAL_PHASE[key] || 0,
   };
 }
@@ -305,25 +424,21 @@ export function buildSolarSystem(scene) {
 
   for (const key of PLANET_ORDER) {
     const p = createPlanet(key);
-    scene.add(p.orbitGroup);
+    scene.add(p.inclGroup);   // 含倾斜轨道面 + 轨道线
     planets.push(p);
     registry.set(key, p);
-
-    const line = createOrbitLine(p.data.displayDist);
-    scene.add(line);
-    orbitLines.push(line);
+    orbitLines.push(p.orbitLine);
   }
 
-  // 月球挂在地球 anchor 下
+  // 月球挂在地球 anchor 下(自带轨道倾角与轨道线)
   const earth = registry.get('earth');
   const moon = createPlanet('moon');
-  earth.anchor.add(moon.orbitGroup);
+  earth.anchor.add(moon.inclGroup);
+  moon.orbitLine.material.color.set(0x4a5a7a);
+  moon.orbitLine.material.opacity = 0.4;
   planets.push(moon);
   registry.set('moon', moon);
-
-  const moonOrbit = createOrbitLine(BODIES.moon.displayDist, 0x4a5a7a, 0.4);
-  earth.anchor.add(moonOrbit);
-  orbitLines.push(moonOrbit);
+  orbitLines.push(moon.orbitLine);
 
   const belt = createAsteroidBelt();
   scene.add(belt);
@@ -331,15 +446,24 @@ export function buildSolarSystem(scene) {
   // 极低环境光:夜半球接近漆黑,晨昏线更有戏剧性(纪录片式明暗)
   scene.add(new THREE.AmbientLight(0x141c2e, 0.22));
 
+  const _sunLocal = new THREE.Vector3();
+
   // elapsedDays: 模拟经过的天数
   function update(elapsedDays, dtSeconds) {
     sun.mat.uniforms.uTime.value += dtSeconds;
     sun.mesh.rotation.y = (elapsedDays / BODIES.sun.rotationDays) * Math.PI * 2;
+    sun.updateProminences(dtSeconds);
 
     for (const p of planets) {
       p.orbitGroup.rotation.y = -(p.phase + (elapsedDays / p.data.orbitDays) * Math.PI * 2);
       p.mesh.rotation.y = (elapsedDays / p.data.rotationDays) * Math.PI * 2;
       if (p.clouds) p.clouds.rotation.y = p.mesh.rotation.y * 1.15;
+      // 土星环:更新太阳方向(环局部空间),使行星本影随公转移动
+      if (p.ringMat) {
+        p.ringMesh.updateWorldMatrix(true, false);
+        p.ringMesh.worldToLocal(_sunLocal.set(0, 0, 0));
+        p.ringMat.uniforms.uSunDir.value.copy(_sunLocal).normalize();
+      }
     }
     belt.rotation.y = -(elapsedDays / 1800) * Math.PI * 2;
   }
